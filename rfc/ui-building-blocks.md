@@ -62,17 +62,83 @@ TODO: add example
 
 ## Reference-level explanation
 
-TODO: Explain StyleParam trait
-TODO: Explain updating
-TODO: Explain why we need the Style marker component (avoid widget inheritance)
+At the heart of the styling design is a data flow that propagates style parameters from the style to the end widget.
+Naively, you'd like to just overwrite the parameter in question, applying the first style's value if any, then the next and so on.
+Unfortunately, this causes issues with dynamically applying and reverting styles, because the original value is lost completely.
 
-This is the technical portion of the RFC. Explain the design in sufficient detail that:
+Rather than duplicating our components in a frustrating way, we can use getter and setter methods on the `StyleParam` trait to ensure that we don't lose this information:
 
-- Its interaction with other features is clear.
-- It is reasonably clear how the feature would be implemented.
-- Corner cases are dissected by example.
+```rust
+trait StyleParam: Component {
+  /// The underlying value of the style parameter, unique to this particular widget
+  ///
+  /// Modifying this value is akin to applying an in-line style to your widget
+  pub fn base(&self) -> Self;  
+  /// The final value of the style parameter, which will be displayed in your app
+  ///
+  /// Obtained by succesively applying the styles found in this widget's `Styles` component,
+  /// with later styles overwriting earlier styles
+  pub fn final(&self) -> Self;  
+  /// Sets the private `final` field to val
+  ///
+  /// In typical usage, this is done automatically for you in the corresponding [propagate_style] system,
+  /// registered using `app.add_style::<S>()
+  pub fn set(&mut self, val: Self);
+}
+```
 
-The section should return to the examples given in the previous section, and explain more fully how the detailed proposal makes those examples work.
+In order for the data to be propagated from our styles to our widgets, we need a set of **style propagation systems**, that work like so:
+
+```rust
+/// Automatically updates the styling for all style parameter components of type `S`
+/// End users should register this system in your app using `app.add_style::<S>()
+pub fn propagate_style<S: StyleParam>(widget_query: Query<(&mut S, &Styles), (With<Widget, Without<Style>, Changed<Styles>>)>,
+  style_query: Query<Option<&S>, With<Style>>){
+
+ for (style_param, styles) in widget_query.iter_mut(){
+  for style in style.iter(){
+   // Grab the corresponding style_param off of each style in order
+   // using style_query.get()
+
+   // If the style is set in that style, use style_param.set() to apply it
+   // This replaces any previous values for the `final` field
+  }
+ }
+}
+```
+
+Style propagation systems should just live in the update stage, and run every loop.
+The `Changed<Styles>` filter will prevent us from doing unnecessary work.
+
+Each theme similarly requires a **theming system**, which, when run, adds the appropriate style to the widgets with the correct component.
+Users can control the priority of the themes by controlling the relative run order of their theming systems in the usual fashion.
+
+These should be constructed ad hoc following a pair of simple examples.
+
+```rust
+pub MyTheme {
+ pub style_entity: Entity
+}
+
+/// Adds an instantiated style to all widgets with the component `M`
+pub fn my_theme<M: Component>(widget_query: Query<&mut Styles, (With<M>, With<Widget>)>, theme: Res<MyTheme>){
+ for styles in widget_query.iter_mut(){
+  styles.push(theme.style_entity);
+ }
+}
+
+/// Adds the style stored in the `style_scene` to all widgets with the component `M`
+pub fn my_stored_theme<M: Component>(mut commands: Commands, 
+ widget_query: Query<Entity, (With<Styles>, With<M>, With<Widget>)>, 
+ style_scene: Handle<DynamicScene>){
+
+ let widget_entities = widget_query.iter().collect();
+ 
+ // Loads in the style scene and create an entity out of it
+ // Then, pushes that entity onto the end of the `Styles` component on each of those entities 
+ commands.apply_stored_theme(style_scene, entities);
+}
+```
 
 ## Drawbacks
 
@@ -81,9 +147,11 @@ Leave your complaints and we'll list them here.
 
 ## Rationale and alternatives
 
-TODO: discuss why it should be part of the ECS.
+TODO: discuss why it should be part of the ECS. Discuss integration with scenes.
 
 TODO: discuss why we want this local styling.
+
+TODO: Explain why we need the Style marker component (avoid widget inheritance)
 
 - Why is this design the best in the space of possible designs?
 - What other designs have been considered and what is the rationale for not choosing them?
@@ -94,9 +162,7 @@ TODO: discuss why we want this local styling.
 
 TODO: dunk on CSS some more.
 
-> So in css you have rules which define the properties to be applied and selectors which determine which elements to apply those rules to. Selectors can be made up of a few different parts. There's the simple selectors like element, id, and class name. There's pseudoselectors, for selecting elements based on a state they are in like hovered. And there's also a way to select elements based on relationships with other elements (such as direct children and descendants) as well as some other more specific selectors. Anyway, each of these different kinds of selectors have an associated specificity. This specificity determines which rules should apply to an element if more than one could apply. If the specificities are the same then it defaults to order declared.
-
-- credit to @geom3trik
+> So in CSS you have rules which define the properties to be applied and selectors which determine which elements to apply those rules to. Selectors can be made up of a few different parts. There's the simple selectors like element, id, and class name. There's pseudo-selectors, for selecting elements based on a state they are in like hovered. And there's also a way to select elements based on relationships with other elements (such as direct children and descendants) as well as some other more specific selectors. Anyway, each of these different kinds of selectors have an associated specificity. This specificity determines which rules should apply to an element if more than one could apply. If the specificities are the same then it defaults to order declared.
 
 Discuss prior art, both the good and the bad, in relation to this proposal.
 This can include:
@@ -112,3 +178,8 @@ Note that while precedent set by other engines is some motivation, it does not o
 
 1. How does this relate to the event-passing that the UI must perform? Does it play nicely?
 2. How does this connect into widget layout?
+3. Can / should we use trait queries to reduce the boilerplate involved in adding new style parameters?
+
+## Future work
+
+Eventually, we can use the `Widget` and `Style` marker components to enforce appropriate `Entity` pointers in both engine and user code using [kinded entities](https://github.com/bevyengine/bevy/issues/1634).
