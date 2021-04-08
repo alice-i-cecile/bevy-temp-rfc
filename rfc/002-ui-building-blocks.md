@@ -29,6 +29,17 @@ Style parameters components on UI widgets that implement the `StyleParam` trait,
 Style parameters can be reused across disparate widget types, with functionality achieved through systems that query for the relevant style components.
 The type of the style parameter components determines which behavior it controlling, while the value returned by `.get()` controls the final behavior of the widget.
 
+When working on complex games or applications, you're likely to want to group your styles into **themes**,
+automatically applying them to large groups of widgets at once.
+In Bevy, themes are applied by adding a generic system that corresponds to that theme to your app's schedule.
+Select a marker component type `W`, then add a theme system to your app with `W` as a type parameter:
+`app.add_startup_system(solarized_theme::<Button>.system())` will then create an entity that stores the solarized theme
+style parameters to your world, and adds the appropriate `Entity` reference to the end of each of the `Styles` components
+on all entities with `Widget` that have the `Button` marker component on them.
+
+Generally, you'll want to add these systems to a startup stage, but you may also find it useful to add them to various `State`s.
+This can work well for quickly toggling between various themes, like you might see in a light-dark mode.
+
 ### Example: Building a Simple Widget
 
 TODO: add example
@@ -37,7 +48,15 @@ TODO: add example
 
 TODO: add example
 
-### Example: Working with Styles
+### Example: Stacking Styles
+
+TODO: add example
+
+### Example: Setting a Theme
+
+TODO: add example
+
+### Example: Toggling Light vs. Dark Mode
 
 TODO: add example
 
@@ -60,8 +79,7 @@ Leave your complaints and we'll list them here.
 
 TODO: discuss why it should be part of the ECS.
 
-TODO: discuss why we want this local styling. 
-
+TODO: discuss why we want this local styling.
 
 - Why is this design the best in the space of possible designs?
 - What other designs have been considered and what is the rationale for not choosing them?
