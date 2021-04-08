@@ -91,6 +91,8 @@ In order for the data to be propagated from our styles to our widgets, we need a
 
 ```rust
 /// Automatically updates the styling for all style parameter components of type `S`
+///
+/// Styles are rebuilt from scratch, working from S.base() each time the styles are changed
 /// End users should register this system in your app using `app.add_style::<S>()
 pub fn propagate_style<S: StyleParam>(widget_query: Query<(&mut S, &Styles), (With<Widget, Without<Style>, Changed<Styles>>)>,
   style_query: Query<Option<&S>, With<Style>>){
