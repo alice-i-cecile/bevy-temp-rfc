@@ -62,6 +62,10 @@ TODO: add example
 
 ## Reference-level explanation
 
+TODO: Explain StyleParam trait
+TODO: Explain updating
+TODO: Explain why we need the Style marker component (avoid widget inheritance)
+
 This is the technical portion of the RFC. Explain the design in sufficient detail that:
 
 - Its interaction with other features is clear.
@@ -89,6 +93,10 @@ TODO: discuss why we want this local styling.
 ## \[Optional\] Prior art
 
 TODO: dunk on CSS some more.
+
+> So in css you have rules which define the properties to be applied and selectors which determine which elements to apply those rules to. Selectors can be made up of a few different parts. There's the simple selectors like element, id, and class name. There's pseudoselectors, for selecting elements based on a state they are in like hovered. And there's also a way to select elements based on relationships with other elements (such as direct children and descendants) as well as some other more specific selectors. Anyway, each of these different kinds of selectors have an associated specificity. This specificity determines which rules should apply to an element if more than one could apply. If the specificities are the same then it defaults to order declared.
+
+- credit to @geom3trik
 
 Discuss prior art, both the good and the bad, in relation to this proposal.
 This can include:
