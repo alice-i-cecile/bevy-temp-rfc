@@ -25,9 +25,12 @@ Widgets in Bevy are represented by entities with a `Widget` marker component.
 Each widget has an associated `Styles` component, which contains a `Vec<Entity>` which points to some (possibly 0) number of **styles**, represented as entities with a `Style` marker component.
 
 Each style in that vector is applied, in order, to the widget, overriding the **style parameters** that already exist.
-Style parameters components on UI widgets that implement the `StyleParam` trait, serve to control some element of its presentation, such as the font, background color or text alignment.
-Style parameters can be reused across disparate widget types, with functionality achieved through systems that query for the relevant style components.
-The type of the style parameter components determines which behavior it controlling, while the value returned by `.get()` controls the final behavior of the widget.
+Style parameters are stored as components, and serve to control some element of its presentation, such as the font, background color or text alignment.
+Style parameters can be reused across disparate widget types, with functionality achieved through systems that query for the relevant components.
+The type of the style parameter components determines which behavior it controls,
+while the value returned by `.get()` controls the final behavior of the widget.
+
+Every style parameter has both a `MyStyle<Base>` and a `MyStyle<Final>` variant, stored together on each entity.
 
 When working on complex games or applications, you're likely to want to group your styles into **themes**,
 automatically applying them to large groups of widgets at once.
@@ -62,30 +65,15 @@ TODO: add example
 
 ## Reference-level explanation
 
+### Style data flow
+
 At the heart of the styling design is a data flow that propagates style parameters from the style to the end widget.
 Naively, you'd like to just overwrite the parameter in question, applying the first style's value if any, then the next and so on.
 Unfortunately, this causes issues with dynamically applying and reverting styles, because the original value is lost completely.
 
-Rather than duplicating our components in a frustrating way, we can use getter and setter methods on the `StyleParam` trait to ensure that we don't lose this information:
-
-```rust
-trait StyleParam: Component {
-  /// The underlying value of the style parameter, unique to this particular widget
-  ///
-  /// Modifying this value is akin to applying an in-line style to your widget
-  pub fn base(&self) -> Self;  
-  /// The final value of the style parameter, which will be displayed in your app
-  ///
-  /// Obtained by succesively applying the styles found in this widget's `Styles` component,
-  /// with later styles overwriting earlier styles
-  pub fn final(&self) -> Self;  
-  /// Sets the private `final` field to val
-  ///
-  /// In typical usage, this is done automatically for you in the corresponding [propagate_style] system,
-  /// registered using `app.add_style::<S>()
-  pub fn set(&mut self, val: Self);
-}
-```
+In order to get around this, we need to somehow duplicate our data, storing both the original and final values.
+This is done by creating two variants of each style parameter component: `MyStyleParameter<Base>` and `MyStyleParameter<Final>`,
+where `Base` and `Final` are simple unit structs used by systems to disambiguate which version of the data are being referred.
 
 In order for the data to be propagated from our styles to our widgets, we need a set of **style propagation systems**, that work like so:
 
@@ -94,7 +82,8 @@ In order for the data to be propagated from our styles to our widgets, we need a
 ///
 /// Styles are rebuilt from scratch, working from S.base() each time the styles are changed
 /// End users should register this system in your app using `app.add_style::<S>()
-pub fn propagate_style<S: StyleParam>(widget_query: Query<(&mut S, &Styles), (With<Widget, Without<Style>, Changed<Styles>>)>,
+pub fn propagate_style<S: Component>(widget_query: Query<(&S<Base>, &mut S<Final>, &Styles), 
+  (With<Widget, Without<Style>, Changed<Styles>>)>,
   style_query: Query<Option<&S>, With<Style>>){
 
  for (style_param, styles) in widget_query.iter_mut(){
@@ -109,10 +98,19 @@ pub fn propagate_style<S: StyleParam>(widget_query: Query<(&mut S, &Styles), (Wi
 }
 ```
 
-Style propagation systems should just live in the update stage, and run every loop.
-The `Changed<Styles>` filter will prevent us from doing unnecessary work.
+Style propagation systems run every loop;
+the `Changed<Styles>` filter will prevent us from doing unnecessary work.
 
-Each theme similarly requires a **theming system**, which, when run, adds the appropriate style to the widgets with the correct component.
+When we call `app.add_style::<S>()`, the following steps occur:
+
+1. We add a `maintain_style::<S>` system to `CoreStage::PreUpdate`, which adds and removes the `Base` and `Final` variants of `S` to entities as needed.
+2. We add the `propagate_style::<S>` system to `CoreStage::Update`.
+
+This is done under the hood for all of the built-in style parameters as part of `DefaultPlugins`.
+
+### Theming systems
+
+Themes are applied to the app using **theming system**, which, when run, adds the appropriate style to the widgets with the correct component.
 Users can control the priority of the themes by controlling the relative run order of their theming systems in the usual fashion.
 
 These should be constructed ad hoc following a pair of simple examples.
