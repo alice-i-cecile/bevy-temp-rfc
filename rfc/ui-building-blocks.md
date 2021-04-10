@@ -31,6 +31,7 @@ The type of the style parameter components determines which behavior it controls
 while the value returned by `.get()` controls the final behavior of the widget.
 
 Every style parameter has both a `MyStyle<Base>` and a `MyStyle<Final>` variant, stored together on each entity.
+When creating a new style parameter, you must ensure that it implements `StyleParam`, typically achieved with `#[derive(StyleParam)]`.
 
 When working on complex games or applications, you're likely to want to group your styles into **themes**,
 automatically applying them to large groups of widgets at once.
@@ -72,8 +73,44 @@ Naively, you'd like to just overwrite the parameter in question, applying the fi
 Unfortunately, this causes issues with dynamically applying and reverting styles, because the original value is lost completely.
 
 In order to get around this, we need to somehow duplicate our data, storing both the original and final values.
-This is done by creating two variants of each style parameter component: `MyStyleParameter<Base>` and `MyStyleParameter<Final>`,
-where `Base` and `Final` are simple unit structs used by systems to disambiguate which version of the data are being referred.
+This is done by creating two variants of each style parameter component: `Foo::Base` and `Foo::Final`.
+
+This requires the `StyleParam` trait:
+
+```rust
+trait StyleParam {
+  type Inner: Clone;
+
+  type Base: Component + DerefMut + Deref<Target = Self::Inner>;
+  type Final: Component + DerefMut + Deref<Target = Self::Inner>;
+}
+```
+
+End users should use the #[style_param] attribute macro on `struct Foo(...)`, which implements the `StyleParam` trait on an ordinary-looking struct.
+Under the hood, this creates the following boilerplate:
+
+```rust
+// PhantomData and the Inner type are used to ensure Foo is !Component
+// This avoids a footgun for users trying to query for Foo directly
+struct Foo(PhantomData<*mut u8>);
+
+// Actual data goes here
+struct FooInnerStyle(...)
+
+struct FooBase(FooInnerStyle);
+struct FooFinal(FooInnerStyle);
+
+/* add impls for deref/mut for both FooBase and FooFinal */
+
+impl StyleParam for Foo {
+  // Both Base and Final should derefence to the same type of data
+  // Allowing us to convert between them
+  type Inner = FooInnerStyle;
+
+  type Base = FooBase;
+  type Final = FooFinal;
+}
+```
 
 In order for the data to be propagated from our styles to our widgets, we need a set of **style propagation systems**, that work like so:
 
@@ -82,7 +119,7 @@ In order for the data to be propagated from our styles to our widgets, we need a
 ///
 /// Styles are rebuilt from scratch, working from S.base() each time the styles are changed
 /// End users should register this system in your app using `app.add_style::<S>()
-pub fn propagate_style<S: Component>(widget_query: Query<(&S<Base>, &mut S<Final>, &Styles), 
+pub fn propagate_style<S: StyleParam>(widget_query: Query<(&S::Base, &mut S::Final, &Styles), 
   (With<Widget, Without<Style>, Changed<Styles>>)>,
   style_query: Query<Option<&S>, With<Style>>){
 
@@ -101,10 +138,10 @@ pub fn propagate_style<S: Component>(widget_query: Query<(&S<Base>, &mut S<Final
 Style propagation systems run every loop;
 the `Changed<Styles>` filter will prevent us from doing unnecessary work.
 
-When we call `app.add_style::<S>()`, the following steps occur:
+When we call `app.add_style::<S::Base, S::Final>()`, the following steps occur:
 
-1. We add a `maintain_style::<S>` system to `CoreStage::PreUpdate`, which adds and removes the `Base` and `Final` variants of `S` to entities as needed.
-2. We add the `propagate_style::<S>` system to `CoreStage::Update`.
+1. We add a `maintain_style::<S::Base, S::Final>` system to `CoreStage::PreUpdate`, which adds and removes the `Base` and `Final` variants of `S` to entities as needed.
+2. We add the `propagate_style::<S::Base, S::Final>` system to `CoreStage::Update`.
 
 This is done under the hood for all of the built-in style parameters as part of `DefaultPlugins`.
 
@@ -144,6 +181,15 @@ pub fn my_stored_theme<M: Component>(mut commands: Commands,
 
 1. Applying stored themes relies on hand-crafted `Commands` magic due to timing issues, rather than being implementable in transparent vanilla Bevy.
 2. Every style parameter component needs its own `propagate_style` and `maintain_style` systems.
+3. The type-system macro magic around `#[style_param]` is complex and mildly cursed.
+4. Implementing traits on `StyleParam` structs doesn't work in the obvious way. 
+Instead of `impl MyTrait for Foo { ... }`, users must do:
+
+```rust
+impl MyTrait for FooInnerStyle { /* ... */ }
+impl MyTrait for FooBase { /* just call into FooInnerStyle */ }
+impl MyTrait for FooFinal { /* just call into FooInnerStyle */ }
+```
 
 ## Rationale and alternatives
 
@@ -216,18 +262,23 @@ Scenes require a large amount of boilerplate to get working right now, including
 ## Unresolved questions
 
 1. Can / should we use trait queries to reduce the boilerplate involved in adding new style parameters?
-2. Which approach to storing original style parameter values should we use?
+2. Does the `#[style_param]` magic work? Particularly with derive macros.
+3. Should we just use two generics in `add_style`, `propagate_style` and `maintain_style` and spare the macro magic?
+4. Do we want to wait for `min_relations` to get a cleaner solution?
 
 ## Future work
 
 Eventually, we can use the `Widget` and `Style` marker components to enforce appropriate `Entity` pointers in both engine and user code using [kinded entities](https://github.com/bevyengine/bevy/issues/1634).
 
 Following the introduction of [archetype invariants](TODO: LINK), an archetype invariant should be added as part of `add_style`,
-which ensures that `Base` and `Final` variants of each component always coexist.
+which ensures that `Base` and `Final` variants of each component always coexist on `Widget` entities.
 
 `Styles` with [relations](TODO: LINK) instead of `Vec<Entity>`.
 
-More advanced user stories?
+As alternative to the mildly cursed `#[style_param]` solution, we could use [relations](TODO: LINK) to duplicate the data.
+The base version of the style parameter data will be a relation with a target of a unique dummy entity, whose identity is stored in a resource.
+Then, the final version of the data is a vanilla component (a relation with no target) of the same type,
+allowing end users to query for style parameter components directly to receive the current value after all styles have been applied.
 
 Finally, in order to fully move forward on the second rendition of `bevy_ui`, we also need to solve the following other UI focus areas:
 
@@ -235,5 +286,4 @@ Finally, in order to fully move forward on the second rendition of `bevy_ui`, we
 2. Layout.
 3. Wiring: call-backs, message passing.
 
-This RFC defines the underlying UI data structures,
-so should be settled first.
+This RFC defines the underlying UI data structures, so should be settled first.
