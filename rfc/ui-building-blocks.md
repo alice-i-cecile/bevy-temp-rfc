@@ -182,7 +182,7 @@ pub fn my_stored_theme<M: Component>(mut commands: Commands,
 1. Applying stored themes relies on hand-crafted `Commands` magic due to timing issues, rather than being implementable in transparent vanilla Bevy.
 2. Every style parameter component needs its own `propagate_style` and `maintain_style` systems.
 3. The type-system macro magic around `#[style_param]` is complex and mildly cursed.
-4. Implementing traits on `StyleParam` structs doesn't work in the obvious way. 
+4. Implementing traits on `StyleParam` structs doesn't work in the obvious way.
 Instead of `impl MyTrait for Foo { ... }`, users must do:
 
 ```rust
@@ -256,7 +256,7 @@ This pattern is clear, and doesn't involve any fancy generics shenanigans.
 However, it makes our components larger (reducing cache efficiency), and is a shift away from Plain Old Data,
 which makes the components more complex to work with as an end user.
 
-The only other obvious existing tools we have to do so are entity (or relevant component) cloning (very hard to implement, see [#??](LINK)) or scenes.
+The only other obvious existing tools we have to do so are entity (or relevant component) cloning (very hard to implement, see [#1515](https://github.com/bevyengine/bevy/issues/1515)) or scenes.
 Scenes require a large amount of boilerplate to get working right now, including on every component, and are likely to be relatively expensive.
 
 ## Unresolved questions
@@ -264,26 +264,25 @@ Scenes require a large amount of boilerplate to get working right now, including
 1. Can / should we use trait queries to reduce the boilerplate involved in adding new style parameters?
 2. Does the `#[style_param]` magic work? Particularly with derive macros.
 3. Should we just use two generics in `add_style`, `propagate_style` and `maintain_style` and spare the macro magic?
-4. Do we want to wait for `min_relations` to get a cleaner solution?
+4. If we're using macro magic, do we care about the `Inner` trait type to avoid the querying footgun?
+5. Do we want to hold off on implementing this until after `min_relations` to get a substantially cleaner solution?
 
 ## Future work
 
-Eventually, we can use the `Widget` and `Style` marker components to enforce appropriate `Entity` pointers in both engine and user code using [kinded entities](https://github.com/bevyengine/bevy/issues/1634).
-
-Following the introduction of [archetype invariants](TODO: LINK), an archetype invariant should be added as part of `add_style`,
+1. Eventually, we can use the `Widget` and `Style` marker components to enforce appropriate `Entity` keys in both engine and user code using [kinded entities](https://github.com/bevyengine/bevy/issues/1634).
+2. Following the introduction of [archetype invariants](https://github.com/bevyengine/bevy/issues/1481),
+an archetype invariant should be added as part of `add_style`,
 which ensures that `Base` and `Final` variants of each component always coexist on `Widget` entities.
-
-`Styles` with [relations](TODO: LINK) instead of `Vec<Entity>`.
-
-As alternative to the mildly cursed `#[style_param]` solution, we could use [relations](TODO: LINK) to duplicate the data.
+3. Once we have fairly advanced [relations](https://github.com/bevyengine/bevy/pull/1627) features, we should look at using them in place of `Vec<Entity>` in `Styles`.
+This is not as trivial as it might appear: `Styles` very much wants an ordered list of entity references (rather than an unordered set or numbered priority list).
+4. As alternative to the mildly cursed `#[style_param]` solution, we could use [relations](https://github.com/bevyengine/bevy/pull/1627) to duplicate the data.
 The base version of the style parameter data will be a relation with a target of a unique dummy entity, whose identity is stored in a resource.
 Then, the final version of the data is a vanilla component (a relation with no target) of the same type,
 allowing end users to query for style parameter components directly to receive the current value after all styles have been applied.
+5. Finally, in order to fully move forward on the second rendition of `bevy_ui`, we also need to solve the following other UI focus areas:
 
-Finally, in order to fully move forward on the second rendition of `bevy_ui`, we also need to solve the following other UI focus areas:
-
-1. Widget composition.
-2. Layout.
-3. Wiring: call-backs, message passing.
+   1. Widget composition.
+   2. Layout.
+   3. Wiring: call-backs, message passing.
 
 This RFC defines the underlying UI data structures, so should be settled first.
