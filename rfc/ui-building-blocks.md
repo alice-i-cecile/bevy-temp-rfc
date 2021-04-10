@@ -142,44 +142,98 @@ pub fn my_stored_theme<M: Component>(mut commands: Commands,
 
 ## Drawbacks
 
-We clearly need *some* standard, but the devil is in the details.
-Leave your complaints and we'll list them here.
+1. Applying stored themes relies on hand-crafted `Commands` magic due to timing issues, rather than being implementable in transparent vanilla Bevy.
+2. Every style parameter component needs its own `propagate_style` and `maintain_style` systems.
 
 ## Rationale and alternatives
 
-TODO: discuss why it should be part of the ECS. Discuss integration with scenes.
+### Why put your UI in the ECS?
 
-TODO: discuss why we want this local styling.
+UI is not terribly performance sensitive, and often involves complex hierarchies that can be a nuisance to fit into an ECS paradigm.
+So why put it there?
 
-TODO: Explain why we need the Style marker component (avoid widget inheritance)
+1. PROOF OF CONCEPT
+2. ERGONOMIC QUERY LANGUAGE
+3. FAMILIAR TOOLS
+4. DYNAMIC UIS AND GAME INTEGRATION
+5. EFFORTLESSLY LOAD UIS WITH SCENES LIKE ANY OTHER GAME OBJECT. ALLOWS FOR DATA-DRIVEN WORKFLOW.
 
-- Why is this design the best in the space of possible designs?
-- What other designs have been considered and what is the rationale for not choosing them?
-- What is the impact of not doing this?
-- Why is this important to implement as a feature of Bevy itself, rather than an ecosystem crate?
+### Approaches to styling
 
-## \[Optional\] Prior art
+Pick up a UI framework, and you'll find a new approach to styling.
+So why *this* approach?
+Let's look at the alternatives.
 
-TODO: dunk on CSS some more.
+1. In-line styles only: you can only configure widgets locally.
+This is, in effect, the current approach of `bevy_ui`.
+It's very explicit, but also very tedious and impossible to synchronize across a large UI.
+If we do not provide a styling solution, users will invent their own ad-hoc, forcing them to think through this design on their own and fragmenting the ecosystem.
+2. Inherited styles.
+3. Cascading styles.
+4. Global style priorities.
+5. Widget-to-widget inheritance.
+This, incidentally, is a large part of the value of the `Style` marker component: to ensure that users are not presented with easy tools to tangle themselves up.
 
-> So in CSS you have rules which define the properties to be applied and selectors which determine which elements to apply those rules to. Selectors can be made up of a few different parts. There's the simple selectors like element, id, and class name. There's pseudo-selectors, for selecting elements based on a state they are in like hovered. And there's also a way to select elements based on relationships with other elements (such as direct children and descendants) as well as some other more specific selectors. Anyway, each of these different kinds of selectors have an associated specificity. This specificity determines which rules should apply to an element if more than one could apply. If the specificities are the same then it defaults to order declared.
+### Storing original style parameter values
 
-Discuss prior art, both the good and the bad, in relation to this proposal.
-This can include:
+While storing old data about the style parameters complicates our design significantly,
+it is critical for managing dynamic changes in style (such as light/dark mode or hover behavior).
+Without automatically caching the value for our users on the component itself, the users (or the engine) are left to cache the state of the widgets before applying the theme on their own, then reset it.
 
-- Does this feature exist in other libraries and what experiences have their community had?
-- Papers: Are there any published papers or great posts that discuss this?
+Instead of our current approach, we could instead cache the previous value of the style parameter components in a resource or a component of its own,
+using trait objects (`Box<dyn StyleParameter>`), then refer to these when restoring the original components.
+This keeps our components simpler, but is more technically challenging and dramatically more magical for end users (who will no longer be able to simply check the original value on their own).
 
-This section is intended to encourage you as an author to think about the lessons from other tools and provide readers of your RFC with a fuller picture.
+Instead of the generics pattern described in the *Reference-Level Explanation*,
+we could use getter and setter methods on the `StyleParam` trait:
 
-Note that while precedent set by other engines is some motivation, it does not on its own motivate an RFC.
+```rust
+trait StyleParam: Component {
+  /// The underlying value of the style parameter, unique to this particular widget
+  ///
+  /// Modifying this value is akin to applying an in-line style to your widget
+  pub fn base(&self) -> Self;  
+  /// The final value of the style parameter, which will be displayed in your app
+  ///
+  /// Obtained by succesively applying the styles found in this widget's `Styles` component,
+  /// with later styles overwriting earlier styles
+  pub fn final(&self) -> Self;  
+  /// Sets the private `final` field to val
+  ///
+  /// In typical usage, this is done automatically for you in the corresponding [propagate_style] system,
+  /// registered using `app.add_style::<S>()
+  pub fn set(&mut self, val: Self);
+}
+```
+
+This pattern is clear, and doesn't involve any fancy generics shenanigans.
+However, it makes our components larger (reducing cache efficiency), and is a shift away from Plain Old Data,
+which makes the components more complex to work with as an end user.
+
+The only other obvious existing tools we have to do so are entity (or relevant component) cloning (very hard to implement, see [#??](LINK)) or scenes.
+Scenes require a large amount of boilerplate to get working right now, including on every component, and are likely to be relatively expensive.
 
 ## Unresolved questions
 
-1. How does this relate to the event-passing that the UI must perform? Does it play nicely?
-2. How does this connect into widget layout?
-3. Can / should we use trait queries to reduce the boilerplate involved in adding new style parameters?
+1. Can / should we use trait queries to reduce the boilerplate involved in adding new style parameters?
+2. Which approach to storing original style parameter values should we use?
 
 ## Future work
 
 Eventually, we can use the `Widget` and `Style` marker components to enforce appropriate `Entity` pointers in both engine and user code using [kinded entities](https://github.com/bevyengine/bevy/issues/1634).
+
+Following the introduction of [archetype invariants](TODO: LINK), an archetype invariant should be added as part of `add_style`,
+which ensures that `Base` and `Final` variants of each component always coexist.
+
+`Styles` with [relations](TODO: LINK) instead of `Vec<Entity>`.
+
+More advanced user stories?
+
+Finally, in order to fully move forward on the second rendition of `bevy_ui`, we also need to solve the following other UI focus areas:
+
+1. Widget composition.
+2. Layout.
+3. Wiring: call-backs, message passing.
+
+This RFC defines the underlying UI data structures,
+so should be settled first.
