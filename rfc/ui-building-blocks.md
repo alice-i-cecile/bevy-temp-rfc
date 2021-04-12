@@ -198,11 +198,14 @@ impl MyTrait for FooFinal { /* just call into FooInnerStyle */ }
 UI is not terribly performance sensitive, and often involves complex hierarchies that can be a nuisance to fit into an ECS paradigm.
 So why put it there?
 
-1. PROOF OF CONCEPT
-2. ERGONOMIC QUERY LANGUAGE
-3. FAMILIAR TOOLS
-4. DYNAMIC UIS AND GAME INTEGRATION
-5. EFFORTLESSLY LOAD UIS WITH SCENES LIKE ANY OTHER GAME OBJECT. ALLOWS FOR DATA-DRIVEN WORKFLOW.
+1. UI is a complex, but reasonably well-understood problem domain.
+By solving the problems presented for our ECS here, we can make it more useful for other gameplay patterns.
+2. Bevy's ECS is a particularly ergonomic and familiar tool for accessing specific data. Why reinvent what works?
+3. UIs will often need to change dynamically, and integrate with the game in complex ways that are hard to predict.
+By making our UI out of vanilla ECS, we can ensure that interoperability and extension are easy.
+4. The ECS provides a great tool for pre-made objects: Scenes.
+Keeping the UI in the ECS ensures we can take advantage of its features and improvements,
+enabling a data-driven workflow for UI designers and artists.
 
 ### Approaches to styling
 
