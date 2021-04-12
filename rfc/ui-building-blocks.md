@@ -81,10 +81,12 @@ fn style_stacking(mut query: Query<&mut Styles, Added<SpecialWidget>>,
 ### Example: Changing Style on Hover
 
 ```rust
+struct Hovering(bool);
+
 fn on_hover(mut query: Query<(&Hovering, &mut Styles), (With<OnHover>, Changed<Hovering>)>, 
   hover_style: Res<HoverStyle>){
   for (hovering, mut styles) in query.iter_mut(){
-    if *hovering {
+    if hovering.0 {
       // Adds the hover style to the widget
       styles.insert(hover_style.entity);
     } else {
