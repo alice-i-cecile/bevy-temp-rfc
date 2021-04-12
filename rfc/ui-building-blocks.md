@@ -67,7 +67,7 @@ commands.spawn_bundle(ButtonBundle::default())
 // 
 // If we wanted to ensure that these styles were always associated with `SpecialWidget` 
 // even after its identity changed, we'd need to write a `Removed` system as well
-fn style_stacking(mut query: Query<&mut Styles, (With<SpecialWidget>, Added<SpecialWidget>)>, 
+fn style_stacking(mut query: Query<&mut Styles, Added<SpecialWidget>>, 
   base_style: Res<BaseStyle>, 
   specialized_style: Res<SpecializedStyle>){
   for mut styles in query.iter_mut(){
