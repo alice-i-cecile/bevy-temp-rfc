@@ -46,23 +46,48 @@ This can work well for quickly toggling between various themes, like you might s
 
 ### Example: Building a Simple Widget
 
-TODO: add example
+```rust
+commands.spawn_bundle(ButtonBundle.default());
+```
 
 ### Example: Building a Compound Widget
 
-TODO: add example
+```rust
+commands.spawn_bundle(ButtonBundle.default())
+  .with_children(TextBundle.default());
+```
 
 ### Example: Stacking Styles
 
-TODO: add example
+```rust
+fn style_stacking(mut query: Query<&mut Styles, With<SpecialWidget>>, 
+ base_style: Res<BaseStyle>, 
+ specialized_style: Res<SpecializedStyle>){
+ for mut styles in query.iter_mut(){
+  // styles.insert removes any matching style, then adds the style to the end of the vec
+  styles.insert(base_style.entity);
+  styles.insert(specialized_style.entity);
+ }
+}
 
-### Example: Setting a Theme
+```
 
-TODO: add example
+### Example: Changing Style on Hover
 
-### Example: Toggling Light vs. Dark Mode
-
-TODO: add example
+```rust
+fn on_hover(mut query: Query<(&Hovering, &mut Styles), (With<OnHover>, Changed<Hovering>)>, 
+ hover_style: Res<HoverStyle>){
+ for (hovering, mut styles) in query.iter_mut(){
+  if hovering.bool {
+   // Adds the hover style to the widget
+   styles.insert(hover_style.entity);
+  } else {
+   // Removes the hover style from the widget, restoring its original appearance
+   styles.remove(hover_style.entity);
+  }
+ }
+}
+```
 
 ## Reference-level explanation
 
