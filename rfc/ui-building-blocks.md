@@ -86,12 +86,11 @@ struct Hovering(bool);
 fn on_hover(mut query: Query<(&IsHovered, &mut Styles), (With<OnHover>, Changed<IsHovered>)>, 
   hover_style: Res<HoverStyle>){
   for (is_hovered, mut styles) in query.iter_mut(){
-    if is_hovered.0 {
+    match is_hovered.0 {
       // Adds the hover style to the widget
-      styles.insert(hover_style.entity);
-    } else {
+      true => styles.insert(hover_style.entity), 
       // Removes the hover style from the widget, restoring its original appearance
-      styles.remove(hover_style.entity);
+      false => styles.remove(hover_style.entity),
     }
   }
 }
