@@ -83,10 +83,10 @@ fn style_stacking(mut query: Query<&mut Styles, Added<SpecialWidget>>,
 ```rust
 struct Hovering(bool);
 
-fn on_hover(mut query: Query<(&Hovering, &mut Styles), (With<OnHover>, Changed<Hovering>)>, 
+fn on_hover(mut query: Query<(&IsHovered, &mut Styles), (With<OnHover>, Changed<IsHovered>)>, 
   hover_style: Res<HoverStyle>){
-  for (hovering, mut styles) in query.iter_mut(){
-    if hovering.0 {
+  for (is_hovered, mut styles) in query.iter_mut(){
+    if is_hovered.0 {
       // Adds the hover style to the widget
       styles.insert(hover_style.entity);
     } else {
@@ -148,6 +148,36 @@ impl StyleParam for Foo {
 In order for the data to be propagated from our styles to our widgets, we need a set of **style propagation systems**, that work like so:
 
 ```rust
+/// Rebuilds the style parameter `S` for the widget
+///
+/// Styles need to be update if either
+/// a) the styles associated with the widget has changed or b) the style's style parameter values have changed
+/// Styles are rebuilt from scratch, working from their base value each time the styles are changed
+fn apply_styles<S:StyleParam>(mut widget_param: &mut S, style_params: Vec<Option<&S>>){  
+  // If the style is set in that style, use style_param.set() to apply it
+  // This replaces any previous values for the `final` field
+}
+
+
+
+/// Automatically updates the styling for all style parameter components of type `S` whose Styles changed
+///
+/// End users should register this system in your app using `app.add_style::<S>()
+pub fn propagate_style<S: StyleParam>(mut widget_query: Query<(&S::Base, &mut S::Final, &Styles), 
+  (With<Widget, Without<Style>, Changed<Styles>>)>,
+  style_query: Query<Option<&S>, With<Style>>){
+ 
+ for (widget_param, styles) in widget_query.iter_mut(){
+    let mut style_params = Vec<Option<&S>>;
+
+    for style in style.iter(){
+      style_params.push(style_query.get_component::<S>());
+    }
+
+   *widget_param = apply_styles(widget_param, style_params);
+ }
+}
+
 /// Automatically updates the styling for all style parameter components of type `S`
 ///
 /// Styles are rebuilt from scratch, working from S.base() each time the styles are changed
@@ -155,17 +185,14 @@ In order for the data to be propagated from our styles to our widgets, we need a
 pub fn propagate_style<S: StyleParam>(widget_query: Query<(&S::Base, &mut S::Final, &Styles), 
   (With<Widget, Without<Style>, Changed<Styles>>)>,
   style_query: Query<Option<&S>, With<Style>>){
-
+ 
  for (style_param, styles) in widget_query.iter_mut(){
    for style in style.iter(){
-   // Grab the corresponding style_param off of each style in order
-   // using style_query.get()
-
-   // If the style is set in that style, use style_param.set() to apply it
-   // This replaces any previous values for the `final` field
+      *style_param = apply_styles(style_param, styles);
    }
  }
 }
+
 ```
 
 Style propagation systems run every loop;
