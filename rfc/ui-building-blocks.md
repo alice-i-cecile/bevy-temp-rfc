@@ -47,14 +47,16 @@ This can work well for quickly toggling between various themes, like you might s
 ### Example: Building a Simple Widget
 
 ```rust
-commands.spawn_bundle(ButtonBundle.default());
+commands.spawn_bundle(ButtonBundle::default());
 ```
 
 ### Example: Building a Compound Widget
 
 ```rust
-commands.spawn_bundle(ButtonBundle.default())
-  .with_children(TextBundle.default());
+commands.spawn_bundle(ButtonBundle::default())
+  .with_children(|parent| {
+    parent.spawn_bundle(TextBundle::default())
+  });
 ```
 
 ### Example: Stacking Styles
