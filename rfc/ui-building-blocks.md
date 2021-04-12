@@ -66,13 +66,13 @@ commands.spawn_bundle(ButtonBundle.default())
 // If we wanted to ensure that these styles were always associated with `SpecialWidget` 
 // even after its identity changed, we'd need to write a `Removed` system as well
 fn style_stacking(mut query: Query<&mut Styles, (With<SpecialWidget>, Added<SpecialWidget>)>, 
- base_style: Res<BaseStyle>, 
- specialized_style: Res<SpecializedStyle>){
- for mut styles in query.iter_mut(){
-  // styles.insert removes any matching style, then adds the style to the end of the vec
-  styles.insert(base_style.entity);
-  styles.insert(specialized_style.entity);
- }
+  base_style: Res<BaseStyle>, 
+  specialized_style: Res<SpecializedStyle>){
+  for mut styles in query.iter_mut(){
+    // styles.insert removes any matching style, then adds the style to the end of the vec
+    styles.insert(base_style.entity);
+    styles.insert(specialized_style.entity);
+  }
 }
 ```
 
@@ -80,16 +80,16 @@ fn style_stacking(mut query: Query<&mut Styles, (With<SpecialWidget>, Added<Spec
 
 ```rust
 fn on_hover(mut query: Query<(&Hovering, &mut Styles), (With<OnHover>, Changed<Hovering>)>, 
- hover_style: Res<HoverStyle>){
- for (hovering, mut styles) in query.iter_mut(){
-  if *hovering {
-   // Adds the hover style to the widget
-   styles.insert(hover_style.entity);
-  } else {
-   // Removes the hover style from the widget, restoring its original appearance
-   styles.remove(hover_style.entity);
+  hover_style: Res<HoverStyle>){
+  for (hovering, mut styles) in query.iter_mut(){
+    if *hovering {
+      // Adds the hover style to the widget
+      styles.insert(hover_style.entity);
+    } else {
+      // Removes the hover style from the widget, restoring its original appearance
+      styles.remove(hover_style.entity);
+    }
   }
- }
 }
 ```
 
@@ -153,13 +153,13 @@ pub fn propagate_style<S: StyleParam>(widget_query: Query<(&S::Base, &mut S::Fin
   style_query: Query<Option<&S>, With<Style>>){
 
  for (style_param, styles) in widget_query.iter_mut(){
-  for style in style.iter(){
+   for style in style.iter(){
    // Grab the corresponding style_param off of each style in order
    // using style_query.get()
 
    // If the style is set in that style, use style_param.set() to apply it
    // This replaces any previous values for the `final` field
-  }
+   }
  }
 }
 ```
@@ -188,21 +188,21 @@ pub MyTheme {
 
 /// Adds an instantiated style to all widgets with the component `M`
 pub fn my_theme<M: Component>(widget_query: Query<&mut Styles, (With<M>, With<Widget>)>, theme: Res<MyTheme>){
- for styles in widget_query.iter_mut(){
-  styles.push(theme.style_entity);
- }
+  for styles in widget_query.iter_mut(){
+    styles.push(theme.style_entity);
+  }
 }
 
 /// Adds the style stored in the `style_scene` to all widgets with the component `M`
 pub fn my_stored_theme<M: Component>(mut commands: Commands, 
- widget_query: Query<Entity, (With<Styles>, With<M>, With<Widget>)>, 
- style_scene: Handle<DynamicScene>){
+  widget_query: Query<Entity, (With<Styles>, With<M>, With<Widget>)>, 
+  style_scene: Handle<DynamicScene>){
 
- let widget_entities = widget_query.iter().collect();
+  let widget_entities = widget_query.iter().collect();
  
- // Loads in the style scene and create an entity out of it
- // Then, pushes that entity onto the end of the `Styles` component on each of those entities 
- commands.apply_stored_theme(style_scene, entities);
+  // Loads in the style scene and create an entity out of it
+  // Then, pushes that entity onto the end of the `Styles` component on each of those entities 
+  commands.apply_stored_theme(style_scene, entities);
 }
 ```
 
