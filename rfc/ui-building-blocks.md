@@ -211,17 +211,35 @@ enabling a data-driven workflow for UI designers and artists.
 
 Pick up a UI framework, and you'll find a new approach to styling.
 So why *this* approach?
-Let's look at the alternatives.
+Let's look at some of the alternatives we should *not* take:
 
-1. In-line styles only: you can only configure widgets locally.
+1. **In-line styles only:** you can only configure widgets locally.
 This is, in effect, the current approach of `bevy_ui`.
 It's very explicit, but also very tedious and impossible to synchronize across a large UI.
 If we do not provide a styling solution, users will invent their own ad-hoc, forcing them to think through this design on their own and fragmenting the ecosystem.
-2. Inherited styles.
-3. Cascading styles.
-4. Global style priorities.
-5. Widget-to-widget inheritance.
-This, incidentally, is a large part of the value of the `Style` marker component: to ensure that users are not presented with easy tools to tangle themselves up.
+2. **Inherited styles:** rather than allowing for multiple styles on each widget with overwriting, we could have a single style per widget,
+and define styles in terms of inheritance from other styles.
+This results in complex inheritance trees, and results in a proliferation of styles, each of which must be named and can be reused.
+Fundamentally, this is a bad pattern because it obscures the underlying end-user logic of "like X, except...".
+3. **Cascading styles:** a widget's styles could cascade down to all other child widgets.
+This leads to more complex non-local behavior,
+requires that all widgets live within a tree,
+and is fragile if you want to move a widget out of the tree it currently lives in.
+Users can also replicate this behavior easily enough with custom systems when it is desired.
+4. **Global style priorities:** rather than defining which styles overwrite the others on each entity,
+we could give each one a "priority", and always apply them in that order.
+This is fiddly to tweak (the same challenge emerges with z-ordering in 2D applications), is harder to debug,
+and can make it very hard to get the exact behavior in special cases.
+Furthermore, this is very easily replicated by simply applying themes via systems that run in a specified order.
+5. **Widget-to-widget inheritance:** we could allow widgets to mirror the styles of other widgets.
+While conceptually simple, this will very quickly result in long and tangled web of inheritance.
+This fragile and complex anti-feature, incidentally, is a large part of the value of the `Style` marker component: to ensure that users are not presented with easy tools to tangle themselves up.
+
+In the end, this approach to styles allows for complex but ergonomic customization with the use of custom systems (ala the themes proposal),
+but still allows for simple, local reasoning about the final results.
+Simply examine the `Styles` on the entity you're attempting to debug, examine the style entities that it points to,
+and you have a complete understanding of why your widget looks the way it does.
+No endless chains or inheritance trees to walk!
 
 ### Storing original style parameter values
 
