@@ -157,12 +157,10 @@ fn apply_styles<S:StyleParam>(mut widget_param: &mut S, style_params: Vec<Option
   // This replaces any previous values for the `final` field
 }
 
-
-
 /// Automatically updates the styling for all style parameter components of type `S` whose Styles changed
 ///
 /// End users should register this system in your app using `app.add_style::<S>()
-pub fn propagate_style<S: StyleParam>(mut widget_query: Query<(&S::Base, &mut S::Final, &Styles), 
+pub fn propagate_styles<S: StyleParam>(mut widget_query: Query<(&S::Base, &mut S::Final, &Styles), 
   (With<Widget, Without<Style>, Changed<Styles>>)>,
   style_query: Query<Option<&S>, With<Style>>){
  
@@ -177,20 +175,28 @@ pub fn propagate_style<S: StyleParam>(mut widget_query: Query<(&S::Base, &mut S:
  }
 }
 
-/// Automatically updates the styling for all style parameter components of type `S`
+
+/// Automatically updates the styling for all style parameter components of type `S` whose underlying style entity changed
 ///
-/// Styles are rebuilt from scratch, working from S.base() each time the styles are changed
 /// End users should register this system in your app using `app.add_style::<S>()
-pub fn propagate_style<S: StyleParam>(widget_query: Query<(&S::Base, &mut S::Final, &Styles), 
-  (With<Widget, Without<Style>, Changed<Styles>>)>,
-  style_query: Query<Option<&S>, With<Style>>){
+pub fn propagate_style_changes<S: StyleParam>(mut widget_query: Query<(&S::Base, &mut S::Final, &Styles), 
+  (With<Widget, Without<Style>>)>,
+  style_query: Query<Option<&S>, (With<Style>, Changed<S>>)){
  
- for (style_param, styles) in widget_query.iter_mut(){
-   for style in style.iter(){
-      *style_param = apply_styles(style_param, styles);
-   }
+ // Implementation note: we can narrow our queries by splitting this work into two systems, despite shared logic
+ for (widget_param, styles) in widget_query.iter_mut(){
+    let mut style_params = Vec<Option<&S>>;
+
+    for style in style.iter(){
+      if style_query.get(style).is_some(){
+        style_params.push(style_query.get_component::<S>());
+      }
+    }
+
+   *widget_param = apply_styles(widget_param, style_params);
  }
 }
+
 
 ```
 
@@ -200,7 +206,8 @@ the `Changed<Styles>` filter will prevent us from doing unnecessary work.
 When we call `app.add_style::<S::Base, S::Final>()`, the following steps occur:
 
 1. We add a `maintain_style::<S::Base, S::Final>` system to `CoreStage::PreUpdate`, which adds and removes the `Base` and `Final` variants of `S` to entities as needed.
-2. We add the `propagate_style::<S::Base, S::Final>` system to `CoreStage::Update`.
+2. We add a `propagate_style_changes::<S::Base, S::Final>` system to `CoreStage::Update`.
+3. We add a `propagate_style::<S::Base, S::Final>` system to `CoreStage::Update`, which runs after the corresponding `propagate_style_changes`.
 
 This is done under the hood for all of the built-in style parameters as part of `DefaultPlugins`.
 
