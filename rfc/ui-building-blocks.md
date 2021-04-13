@@ -267,16 +267,19 @@ fn main{
 // In particular, it's not idempotent.
 // This example was chosen to demonstrate the API more fully,
 // and the expressivity of using the ECS to modify UI.
-pub fn toggle_light_dark<M: Component>(widget_query: Query<&mut Styles, (With<M::Final>, With<Widget>)>, 
+pub fn toggle_light_dark<M: Component>(
+  widget_query: Query<&mut Styles, (With<M::Final>, With<Widget>)>, 
   light_theme: Res<LightTheme>,
-  dark_theme: Res<DarkTheme>){
+  dark_theme: Res<DarkTheme>,
+  state: Res<State<LightDarkMode>>
+){
+  let (searched, replace) = match state.active() {
+    LightDarkMode::Light => (dark_theme.style_entity, light_theme.style_entity),
+    LightDarkMode::Dark => (light_theme.style_entity, dark_theme.style_entity),
+  }
+  
   for styles in widget_query.iter_mut(){
-    if styles.contains(light_theme.style_entity){
-      // The `Styles::replace` method replaces the specified style with a new style in the same position
-      styles.replace(light_theme.style_entity, dark_theme.style_entity);
-    } else if styles.contains(dark_theme.style_entity){
-      styles.replace(dark_theme.style_entity, light_theme.style_entity);
-    }
+    styles.replace(searched, replace);
   }
 }
 ```
