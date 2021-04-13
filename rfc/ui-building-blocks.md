@@ -263,10 +263,6 @@ fn main{
     .add_system_set(SystemSet::on_enter(LightDarkMode::Dark).with_system(toggle_light_dark::<Widget>.system()))
 }
 
-// Note: this may not be the optimal approach to handle light-dark mode toggling
-// In particular, it's not idempotent.
-// This example was chosen to demonstrate the API more fully,
-// and the expressivity of using the ECS to modify UI.
 pub fn toggle_light_dark<M: Component>(
   widget_query: Query<&mut Styles, (With<M::Final>, With<Widget>)>, 
   light_theme: Res<LightTheme>,
@@ -277,8 +273,9 @@ pub fn toggle_light_dark<M: Component>(
     LightDarkMode::Light => (dark_theme.style_entity, light_theme.style_entity),
     LightDarkMode::Dark => (light_theme.style_entity, dark_theme.style_entity),
   }
-  
+
   for styles in widget_query.iter_mut(){
+    // The `Styles::replace` method replaces the specified style with a new style in the same position
     styles.replace(searched, replace);
   }
 }
