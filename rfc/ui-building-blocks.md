@@ -162,10 +162,10 @@ fn apply_styles<S:StyleParam>(mut widget_param: &mut S, style_params: Vec<Option
 /// End users should register this system in your app using `app.add_style::<S>()
 pub fn propagate_styles<S: StyleParam>(mut widget_query: Query<(&S::Base, &mut S::Final, &Styles), 
   (With<Widget, Without<Style>, Changed<Styles>>)>,
-  style_query: Query<Option<&S>, With<Style>>){
+  style_query: Query<Option<&S::Base>, With<Style>>){
  
  for (widget_param, styles) in widget_query.iter_mut(){
-    let mut style_params = Vec<Option<&S>>;
+    let mut style_params = Vec<Option<&S::Base>>;
 
     for style in style.iter(){
       style_params.push(style_query.get_component::<S>());
@@ -181,15 +181,15 @@ pub fn propagate_styles<S: StyleParam>(mut widget_query: Query<(&S::Base, &mut S
 /// End users should register this system in your app using `app.add_style::<S>()
 pub fn propagate_style_changes<S: StyleParam>(mut widget_query: Query<(&S::Base, &mut S::Final, &Styles), 
   (With<Widget, Without<Style>>)>,
-  style_query: Query<Option<&S>, (With<Style>, Changed<S>>)){
+  style_query: Query<Option<&S::Base>, (With<Style>, Changed<S::Base>>)){
  
  // Implementation note: we can narrow our queries by splitting this work into two systems, despite shared logic
  for (widget_param, styles) in widget_query.iter_mut(){
-    let mut style_params = Vec<Option<&S>>;
+    let mut style_params = Vec<Option<&S::Base>>;
 
     for style in style.iter(){
       if style_query.get(style).is_some(){
-        style_params.push(style_query.get_component::<S>());
+        style_params.push(style_query.get_component::<S::Base>());
       }
     }
 
