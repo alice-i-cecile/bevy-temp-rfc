@@ -224,7 +224,7 @@ pub MyTheme {
 }
 
 /// Adds an instantiated style to all widgets with the component `M`
-pub fn my_theme<M: Component>(widget_query: Query<&mut Styles, (With<M>, With<Widget>)>, theme: Res<MyTheme>){
+pub fn my_theme<M: Component>(widget_query: Query<&mut Styles, (With<M::Final>, With<Widget>)>, theme: Res<MyTheme>){
   for styles in widget_query.iter_mut(){
     styles.push(theme.style_entity);
   }
@@ -232,7 +232,7 @@ pub fn my_theme<M: Component>(widget_query: Query<&mut Styles, (With<M>, With<Wi
 
 /// Adds the style stored in the `style_scene` to all widgets with the component `M`
 pub fn my_stored_theme<M: Component>(mut commands: Commands, 
-  widget_query: Query<Entity, (With<Styles>, With<M>, With<Widget>)>, 
+  widget_query: Query<Entity, (With<Styles>, With<M::Final>, With<Widget>)>, 
   style_scene: Handle<DynamicScene>){
 
   let widget_entities = widget_query.iter().collect();
@@ -240,6 +240,44 @@ pub fn my_stored_theme<M: Component>(mut commands: Commands,
   // Loads in the style scene and create an entity out of it
   // Then, pushes that entity onto the end of the `Styles` component on each of those entities 
   commands.apply_stored_theme(style_scene, entities);
+}
+```
+
+We can apply this to construct a simple light-dark mode toggle, by combining this with app-level states:
+
+```rust
+enum LightDarkMode{
+  Light,
+  Dark
+}
+
+fn main{
+  App::build()
+    // These are automatically constructed using a FromWorld implementation that creates the appropriate entity 
+    // and stores a reference to the correct entity
+    .init_resource::<LightTheme>()
+    .init_resource::<DarkTheme>()
+    // Controls the starting state
+    .add_state(LightDarkMode::Dark)
+    .add_system_set(SystemSet::on_enter(LightDarkMode::Light).with_system(toggle_light_dark::<Widget>.system()))
+    .add_system_set(SystemSet::on_enter(LightDarkMode::Dark).with_system(toggle_light_dark::<Widget>.system()))
+}
+
+// Note: this may not be the optimal approach to handle light-dark mode toggling
+// In particular, it's not idempotent.
+// This example was chosen to demonstrate the API more fully,
+// and the expressivity of using the ECS to modify UI.
+pub fn toggle_light_dark<M: Component>(widget_query: Query<&mut Styles, (With<M::Final>, With<Widget>)>, 
+  light_theme: Res<LightTheme>,
+  dark_theme: Res<DarkTheme>){
+  for styles in widget_query.iter_mut(){
+    if styles.contains(light_theme.style_entity){
+      // The `Styles::replace` method replaces the specified style with a new style in the same position
+      styles.replace(light_theme.style_entity, dark_theme.style_entity);
+    } else if styles.contains(dark_theme.style_entity){
+      styles.replace(dark_theme.style_entity, light_theme.style_entity);
+    }
+  }
 }
 ```
 
